@@ -68,10 +68,10 @@
                 <div class="card p-3">
                     <h4>Робот</h4>
                 <!-- <p class="status-online">ONLINE</p> -->
-                    <p>X: <span id="robot_x">0</span></p>
-                    <p>Y: <span id="robot_y">0</span></p>
-                    <p>Battery: <span id="battery">100</span> %</p>
-                    <p>State: <span id="state">Idle</span></p>
+                    <p>X: <span id="robot_x">Nan</span></p>
+                    <p>Y: <span id="robot_y">Nan</span></p>
+                    <!-- <p>Battery: <span id="battery">100</span> %</p> -->
+                    <p>State: <span id="status">Idle</span></p>
                 </div>
             </div>
 
@@ -145,7 +145,7 @@
             const robot = await res.json();
             document.getElementById("robot_x").textContent = robot.x ?? "-";
             document.getElementById("robot_y").textContent = robot.y ?? "-";
-            document.getElementById("battery").textContent = robot.battery ?? "-";
+            // document.getElementById("battery").textContent = robot.battery ?? "-";
             document.getElementById("status").textContent = robot.status ?? "Unknown";
         }
 
@@ -268,15 +268,22 @@
             ]);
         }
         update();
-        setInterval(update, 2000);
+        setInterval(update, 500);
         async function update1() {
             await Promise.all([
-                loadSelects(),
                 loadTasks(),
             ]);
         }
         update1();
         setInterval(update1, 5000);
+
+        async function update2() {
+            await Promise.all([
+                loadSelects(),
+            ]);
+        }
+        update2();
+        setInterval(update2, 10000);
     </script>
 </body>
 

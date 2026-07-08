@@ -3,11 +3,8 @@ from flask_cors import CORS
 import uuid
 
 app = Flask(__name__)
-CORS(app)  # Разрешаем CORS для всех маршрутов по умолчанию
+CORS(app)
 
-# -----------------------------
-# Хранилище (в памяти)
-# -----------------------------
 
 locations = {}  # Словарь всех точек {id: {"id":..., "type":..., "x":..., "y":...}}
 warehouses = (
@@ -24,9 +21,8 @@ tasks = (
 next_item_id = 1  # Счётчик для присвоения новых ID грузам
 
 robot_status = {}
-# -----------------------------
+
 # Эндпоинты API
-# -----------------------------
 
 
 @app.route("/")
@@ -41,7 +37,8 @@ def register_qr():
     Ожидает JSON: { "id": int "x": float, "y": float }
     """
     data = request.get_json()
-    if not data or "id" not in data or int(data["id"]) > 4:
+    print(data)
+    if not data or "id" not in data or len(data["id"]) > 1:
         abort(400, "Missing 'id' or 'id' > 4")
     loc_id = data["id"]
     loc_type = "pickup" if len(pickups) == 0 else "warehouse"
@@ -122,34 +119,42 @@ def create_item():
 def create_task():
     """
     Создаёт новую задачу перевозки.
-    JSON запроса: { "item_id": int, "from": str, "to": str }
-    или { "item": { "name": str, "weight": num }, "from": str, "to": str, 'x': float, 'y': float }.
+    JSON запроса:
+      { "item_id": int, "from": str, "to": str }
+      или { "item": { "name": str, "weight": num }, "from": str, "to": str }
+      или { "weight": num, "from": str, "to": str }  -- взять любой груз такого веса со склада
     """
     global next_item_id
     data = request.get_json()
     if not data or "from" not in data or "to" not in data:
         abort(400, "Missing 'from' or 'to'")
+
     src = data["from"]
     dst = data["to"]
+
     # Проверяем существование пунктов
     if src not in pickups and src not in warehouses:
         abort(404, f"Source '{src}' not found")
     if dst not in pickups and dst not in warehouses:
         abort(404, f"Destination '{dst}' not found")
-    # Определяем item_id: либо передан, либо создаём новый груз
+
     item_id = None
+
+    # Вариант 1: передан конкретный item_id
     if "item_id" in data:
         item_id = data["item_id"]
         if item_id not in items:
             abort(404, f"Item ID {item_id} not found")
+
+    # Вариант 2: создать новый груз (pickup -> warehouse или pickup -> pickup)
     elif "item" in data:
         item_info = data["item"]
-        # Ожидаем поля name и weight
         if not item_info or "name" not in item_info or "weight" not in item_info:
             abort(400, "Item data must include 'name' and 'weight'")
+
         name = item_info["name"]
         weight = item_info["weight"]
-        # Создаём новый item и добавляем в source
+
         item_id = next_item_id
         next_item_id += 1
         items[item_id] = {
@@ -158,23 +163,45 @@ def create_task():
             "weight": weight,
             "location": src,
         }
-        # Помещаем груз в исходное место
+
         if src in pickups:
             pickups[src]["items"].append(item_id)
         else:
-            wh_src = warehouses[src]
-            if weight > wh_src["free_place"]:
+            wh = warehouses[src]
+            if weight > wh["free_place"]:
                 abort(400, f"Not enough space in warehouse '{src}' for new item")
-            wh_src["items"].append(item_id)
-            wh_src["free_place"] -= weight
+            wh["items"].append(item_id)
+            wh["free_place"] -= weight
+
+    # Вариант 3: взять любой существующий груз по весу (warehouse -> warehouse)
+    elif "weight" in data:
+        if src not in warehouses:
+            abort(400, "Weight-based pickup only works from warehouses")
+
+        target_weight = data["weight"]
+        wh = warehouses[src]
+
+        # Ищем первый подходящий груз на складе
+        for candidate_id in wh["items"]:
+            if items[candidate_id]["weight"] == target_weight:
+                item_id = candidate_id
+                break
+
+        if item_id is None:
+            abort(
+                404, f"No item with weight {target_weight} found in warehouse '{src}'"
+            )
+
     else:
-        abort(400, "Missing 'item_id' or 'item' in request")
+        abort(400, "Missing 'item_id', 'item' or 'weight' in request")
+
     # Проверяем, что груз действительно находится в src
     if items[item_id]["location"] != src:
         abort(400, f"Item {item_id} is not at source '{src}'")
+
     # Создаём задачу
     task = {
-        "id": str(uuid.uuid4()),  # Генерируем уникальный ID задачи
+        "id": str(uuid.uuid4()),
         "item_id": item_id,
         "from": src,
         "to": dst,
@@ -295,9 +322,7 @@ def get_items():
     return jsonify(items)
 
 
-# -----------------------------
 # Ошибка по умолчанию
-# -----------------------------
 
 
 @app.errorhandler(404)
