@@ -67,7 +67,7 @@
             <div class="col-md-4">
                 <div class="card p-3">
                     <h4>Робот</h4>
-                <!-- <p class="status-online">ONLINE</p> -->
+                    <!-- <p class="status-online">ONLINE</p> -->
                     <p>X: <span id="robot_x">Nan</span></p>
                     <p>Y: <span id="robot_y">Nan</span></p>
                     <!-- <p>Battery: <span id="battery">100</span> %</p> -->
@@ -253,7 +253,7 @@
                 alert("Ошибка: " + (err.error || res.statusText));
                 return;
             }
-            document.getElementById("item_name").value = "";
+            document.getElementById("item_name").value = "box1";
             document.getElementById("item_weight").value = "1";
             loadTasks();
             loadWarehouses();
@@ -275,7 +275,7 @@
             ]);
         }
         update1();
-        setInterval(update1, 5000);
+        setInterval(update1, 2000);
 
         async function update2() {
             await Promise.all([

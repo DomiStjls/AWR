@@ -5,6 +5,8 @@ import uuid
 app = Flask(__name__)
 CORS(app)
 
+# короче не работает когда я со складов перевожу кудато
+
 
 locations = {}  # Словарь всех точек {id: {"id":..., "type":..., "x":..., "y":...}}
 warehouses = (
@@ -38,7 +40,7 @@ def register_qr():
     """
     data = request.get_json()
     print(data)
-    if not data or "id" not in data or len(data["id"]) > 1:
+    if not data or "id" not in data or int(data["id"]) > 5:
         abort(400, "Missing 'id' or 'id' > 4")
     loc_id = data["id"]
     loc_type = "pickup" if len(pickups) == 0 else "warehouse"
@@ -54,11 +56,13 @@ def register_qr():
         warehouses[loc_id] = {"capacity": capacity, "free_place": capacity, "items": []}
     elif loc_type == "pickup":
         pickups[loc_id] = {"items": []}
+        
     else:
         abort(400, "Type must be 'warehouse' or 'pickup'")
+        
     return jsonify({"status": "ok", "location": locations[loc_id]}), 201
 
-
+   
 @app.route("/locations", methods=["GET"])
 def get_locations():
     return jsonify(locations)
@@ -126,6 +130,7 @@ def create_task():
     """
     global next_item_id
     data = request.get_json()
+    print(data)
     if not data or "from" not in data or "to" not in data:
         abort(400, "Missing 'from' or 'to'")
 
@@ -146,7 +151,23 @@ def create_task():
         if item_id not in items:
             abort(404, f"Item ID {item_id} not found")
 
-    # Вариант 2: создать новый груз (pickup -> warehouse или pickup -> pickup)
+    # Вариант 2: взять существующий груз по весу (только warehouse -> *)
+    # elif "weight" in data and src in warehouses:
+        
+    #     target_weight = data["weight"]
+    #     wh = warehouses[src]
+
+    #     for candidate_id in wh["items"]:
+    #         if items[candidate_id]["weight"] == target_weight:
+    #             item_id = candidate_id
+    #             break
+
+    #     if item_id is None:
+    #         abort(
+    #             404, f"No item with weight {target_weight} found in warehouse '{src}'"
+    #         )
+
+    # Вариант 3: создать новый груз (pickup -> * или явно передан item)
     elif "item" in data:
         item_info = data["item"]
         if not item_info or "name" not in item_info or "weight" not in item_info:
@@ -154,43 +175,28 @@ def create_task():
 
         name = item_info["name"]
         weight = item_info["weight"]
-
-        item_id = next_item_id
-        next_item_id += 1
-        items[item_id] = {
-            "id": item_id,
-            "name": name,
-            "weight": weight,
-            "location": src,
-        }
-
-        if src in pickups:
-            pickups[src]["items"].append(item_id)
-        else:
+        if src in warehouses:
+            # Проверяем, что вес соответствует складу
             wh = warehouses[src]
-            if weight > wh["free_place"]:
-                abort(400, f"Not enough space in warehouse '{src}' for new item")
-            wh["items"].append(item_id)
-            wh["free_place"] -= weight
+            for el in wh["items"]:
+                if items[el]["weight"] == weight:
+                    item_id = el
+                    break
+            if item_id is None:
+                abort(400, f"No item with weight {weight} found in warehouse '{src}'")
+        else:
+            
+            item_id = next_item_id
+            next_item_id += 1
+            items[item_id] = {
+                "id": item_id,
+                "name": name,
+                "weight": weight,
+                "location": src,
+            }
+            pickups[src]["items"].append(item_id)
 
-    # Вариант 3: взять любой существующий груз по весу (warehouse -> warehouse)
-    elif "weight" in data:
-        if src not in warehouses:
-            abort(400, "Weight-based pickup only works from warehouses")
-
-        target_weight = data["weight"]
-        wh = warehouses[src]
-
-        # Ищем первый подходящий груз на складе
-        for candidate_id in wh["items"]:
-            if items[candidate_id]["weight"] == target_weight:
-                item_id = candidate_id
-                break
-
-        if item_id is None:
-            abort(
-                404, f"No item with weight {target_weight} found in warehouse '{src}'"
-            )
+        
 
     else:
         abort(400, "Missing 'item_id', 'item' or 'weight' in request")
