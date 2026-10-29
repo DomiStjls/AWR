@@ -37,25 +37,10 @@ RoboMarvel Warehouse System — прототип автономной робот
 
 # Структура проекта
 
-```
-project/
-│
-├── ros2_ws/
-│   ├── driver/
-│   ├── navigation/
-│   ├── qr_detector/
-│   └── ...
-│
-├── server/
-│   ├── app.py
-│   ├── templates/
-│   │   └── index.html
-│   └── static/
-│
-├── tests/
-│
-└── README.md
-```
+- `nodes/` — узлы для работы с маркерами, сервером и движением.
+- `server/app.py` — Flask-сервер.
+- `server/templates/` — веб-интерфейс.
+- `server/tests/` — пример создания задания.
 
 ---
 
@@ -296,35 +281,14 @@ GET
 
 # Запуск проекта
 
-## Запуск Flask-сервера
+Для запуска серверной части из корня репозитория необходимы Python, Flask и Flask-CORS:
 
 ```bash
-python app.py
+pip install flask flask-cors
+python server/app.py
 ```
 
----
-
-## Запуск рабочего пространства ROS2
-
-```bash
-source install/setup.bash
-```
-
----
-
-## Запуск узла управления роботом
-
-```bash
-ros2 run <package_name> <driver_node>
-```
-
----
-
-## Открытие веб-интерфейса
-
-```
-http://localhost:5000
-```
+Сервер слушает порт 5000. Узлы в `nodes/` требуют окружения ROS 2 и дополнительных зависимостей; готового ROS-пакета и полной инструкции запуска в репозитории нет. Запуск не проверен.
 
 ---
 
